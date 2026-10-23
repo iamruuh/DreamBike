@@ -25,58 +25,64 @@
 <script src="https://jsdelivr.net"></script>
 <script>
     let audioCtx = null, oscillator = null, gainNode = null;
-    const liveAmpDisplay = document.getElementById('liveAmp');
-    const adminStatus = document.getElementById('adminStatus');
+const liveAmpDisplay = document.getElementById('liveAmp');
+const adminStatus = document.getElementById('adminStatus');
 
-    document.getElementById('startSessionBtn').addEventListener('click', function() {
-        const roomName = document.getElementById('myRoomId').value.trim();
-        if(!roomName) return alert("Please type a custom Room ID!");
+document.getElementById('startSessionBtn').addEventListener('click', function() {
+    const roomName = document.getElementById('myRoomId').value.trim();
+    if(!roomName) return alert("Please type a custom Room ID!");
 
-        // Start Web Audio API
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        oscillator = audioCtx.createOscillator();
-        gainNode = audioCtx.createGain();
-        
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
-        gainNode.gain.setValueAtTime(0, audioCtx.currentTime); 
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        oscillator.start();
+    // Start Audio
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    oscillator = audioCtx.createOscillator();
+    gainNode = audioCtx.createGain();
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+    gainNode.gain.setValueAtTime(0, audioCtx.currentTime); 
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.start();
 
-        const peer = new Peer(roomName);
+    // Setup configuration rules to parse iPhone packets cleanly
+    const peer = new Peer(roomName, {
+        config: {
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        }
+    });
 
-        peer.on('open', function(id) {
-            adminStatus.textContent = "Room Live! Share ID: " + id;
-            adminStatus.style.color = "#007bff";
-        });
+    peer.on('open', function(id) {
+        adminStatus.textContent = "Room Live! Share ID: " + id;
+        adminStatus.style.color = "#007bff";
+    });
 
-        peer.on('error', function(err) {
-            if(err.type === 'unavailable-id') {
-                alert("That Room ID is taken! Try another word.");
-                location.reload();
+    peer.on('error', function(err) {
+        if(err.type === 'unavailable-id') {
+            alert("That Room ID is taken! Try another word.");
+            location.reload();
+        }
+    });
+
+    peer.on('connection', function(conn) {
+        adminStatus.textContent = "User connected successfully!";
+        adminStatus.style.color = "#28a745";
+
+        conn.on('data', function(data) {
+            // Unpacks standard formatting safely on iPhone
+            if (data && data.amplitude !== undefined) {
+                liveAmpDisplay.textContent = data.amplitude;
+                if (gainNode && audioCtx) {
+                    gainNode.gain.setTargetAtTime(data.amplitude / 100, audioCtx.currentTime, 0.01);
+                }
             }
         });
-
-        peer.on('connection', function(conn) {
-            adminStatus.textContent = "User connected successfully!";
-            adminStatus.style.color = "#28a745";
-
-            conn.on('data', function(data) {
-                if (data.amplitude !== undefined) {
-                    liveAmpDisplay.textContent = data.amplitude;
-                    if (gainNode && audioCtx) {
-                        gainNode.gain.setTargetAtTime(data.amplitude / 100, audioCtx.currentTime, 0.01);
-                    }
-                }
-            });
-        });
-
-        this.disabled = true;
-        this.style.background = "#6c757d";
-        this.textContent = "Listening Mode Active";
     });
+
+    this.disabled = true;
+    this.style.background = "#6c757d";
+    this.textContent = "Listening Mode Active";
+});
 </script>
 </body>
 </html>
