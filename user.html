@@ -29,41 +29,47 @@
 <script src="https://jsdelivr.net"></script>
 <script>
     const slider = document.getElementById('userSlider');
-    const valDisplay = document.getElementById('userVal');
-    const roomIdInput = document.getElementById('roomIdInput');
-    const connectBtn = document.getElementById('connectBtn');
-    const statusTxt = document.getElementById('statusTxt');
+const valDisplay = document.getElementById('userVal');
+const roomIdInput = document.getElementById('roomIdInput');
+const connectBtn = document.getElementById('connectBtn');
+const statusTxt = document.getElementById('statusTxt');
+
+let peer = new Peer(); 
+let conn = null;
+
+connectBtn.addEventListener('click', function() {
+    const targetRoom = roomIdInput.value.trim();
+    if(!targetRoom) return alert("Please enter a Room ID!");
     
-    let peer = new Peer(); 
-    let conn = null;
-
-    connectBtn.addEventListener('click', function() {
-        const targetRoom = roomIdInput.value.trim();
-        if(!targetRoom) return alert("Please enter a Room ID!");
-        
-        statusTxt.textContent = "Connecting to admin...";
-        conn = peer.connect(targetRoom);
-        
-        conn.on('open', function() {
-            statusTxt.textContent = "Connected Live! Control active.";
-            statusTxt.style.color = "#28a745";
-            slider.disabled = false;
-        });
-
-        conn.on('close', function() {
-            statusTxt.textContent = "Connection lost.";
-            statusTxt.style.color = "#dc3545";
-            slider.disabled = true;
-        });
+    statusTxt.textContent = "Connecting to admin...";
+    
+    // FIX: Forces standard JSON packaging so Android and iPhone talk the same language
+    conn = peer.connect(targetRoom, {
+        serialization: "json",
+        reliable: true
+    });
+    
+    conn.on('open', function() {
+        statusTxt.textContent = "Connected Live! Control active.";
+        statusTxt.style.color = "#28a745";
+        slider.disabled = false;
     });
 
-    slider.addEventListener('input', function(e) {
-        const val = e.target.value;
-        valDisplay.textContent = val;
-        if (conn && conn.open) {
-            conn.send({ amplitude: parseInt(val) });
-        }
+    conn.on('close', function() {
+        statusTxt.textContent = "Connection lost.";
+        statusTxt.style.color = "#dc3545";
+        slider.disabled = true;
     });
+});
+
+slider.addEventListener('input', function(e) {
+    const val = e.target.value;
+    valDisplay.textContent = val;
+    if (conn && conn.open) {
+        // Sends standard object package
+        conn.send({ amplitude: parseInt(val) });
+    }
+});
 </script>
 </body>
 </html>
