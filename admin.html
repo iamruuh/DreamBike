@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <style>
+        body { font-family: system-ui, sans-serif; text-align: center; background: #f8f9fa; padding: 30px; }
+        .box { background: white; max-width: 400px; margin: auto; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        input[type="text"] { padding: 10px; font-size: 16px; width: 80%; border-radius: 6px; border: 1px solid #ccc; text-align: center; margin-bottom: 15px; }
+        button { background: #28a745; color: white; border: none; padding: 12px 24px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 85%; }
+        #liveAmp { color: #28a745; font-size: 2.5rem; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>Listener Dashboard</h2>
+    <input type="text" id="myRoomId" placeholder="Create Room ID (e.g., sound77)"><br>
+    <button id="startSessionBtn">🔊 Open Room & Listen Live</button>
+    <p id="adminStatus" style="color: #666; font-weight: bold; margin-top: 15px;"></p>
+    <h3 style="margin-top: 20px; color: #555;">Incoming Amplitude:<br><span id="liveAmp">0</span>%</h3>
+</div>
+
+<script src="https://jsdelivr.net"></script>
+<script>
+    let audioCtx = null, oscillator = null, gainNode = null;
+    const liveAmpDisplay = document.getElementById('liveAmp');
+    const adminStatus = document.getElementById('adminStatus');
+
+    document.getElementById('startSessionBtn').addEventListener('click', function() {
+        const roomName = document.getElementById('myRoomId').value.trim();
+        if(!roomName) return alert("Please type a custom Room ID!");
+
+        // Start Web Audio API
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        oscillator = audioCtx.createOscillator();
+        gainNode = audioCtx.createGain();
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0, audioCtx.currentTime); 
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.start();
+
+        const peer = new Peer(roomName);
+
+        peer.on('open', function(id) {
+            adminStatus.textContent = "Room Live! Share ID: " + id;
+            adminStatus.style.color = "#007bff";
+        });
+
+        peer.on('error', function(err) {
+            if(err.type === 'unavailable-id') {
+                alert("That Room ID is taken! Try another word.");
+                location.reload();
+            }
+        });
+
+        peer.on('connection', function(conn) {
+            adminStatus.textContent = "User connected successfully!";
+            adminStatus.style.color = "#28a745";
+
+            conn.on('data', function(data) {
+                if (data.amplitude !== undefined) {
+                    liveAmpDisplay.textContent = data.amplitude;
+                    if (gainNode && audioCtx) {
+                        gainNode.gain.setTargetAtTime(data.amplitude / 100, audioCtx.currentTime, 0.01);
+                    }
+                }
+            });
+        });
+
+        this.disabled = true;
+        this.style.background = "#6c757d";
+        this.textContent = "Listening Mode Active";
+    });
+</script>
+</body>
+</html>
